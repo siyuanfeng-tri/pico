@@ -58,7 +58,8 @@ class PicoFlexDriver {
 public:
   struct DepthImage {
     // This is CV_32F, in [mm]
-    cv::Mat image;
+    cv::Mat depth_image;
+    cv::Mat confidence_image;
     uint64_t timestamp;
     uint64_t id;
   };

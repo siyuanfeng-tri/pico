@@ -85,13 +85,15 @@ PicoFlexDriver::DepthImage PicoFlexDriver::GetDepthImage() const {
   }
 
   ret.timestamp = latest.timestamp;
-  ret.image = cv::Mat(latest.height, latest.width, CV_32F);
+  ret.depth_image = cv::Mat(latest.height, latest.width, CV_32F);
+  ret.confidence_image = cv::Mat(latest.height, latest.width, CV_32F);
   for (uint16_t i = 0; i < latest.height; i++) {
     for (uint16_t j = 0; j < latest.width; j++) {
       uint16_t data = latest.data.at(i * latest.width + j);
       uint16_t z = data & 0x1fff;
-      // uint16_t confidence = (data >> 13) & 0x7;
-      ret.image.at<float>(i, j) = static_cast<float>(z) / 1e3;
+      uint16_t confidence = (data >> 13) & 0x7;
+      ret.depth_image.at<float>(i, j) = static_cast<float>(z) / 1e3;
+      ret.confidence_image.at<float>(i, j) = static_cast<float>(confidence) / 1e3;
     }
   }
 

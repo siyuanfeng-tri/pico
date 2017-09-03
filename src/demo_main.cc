@@ -20,7 +20,8 @@ int main() {
       continue;
     }
 
-    cv::imshow("Display window", img.image);
+    //cv::imshow("Display window", img.confidence_image);
+    cv::imshow("Display window", img.depth_image);
     cv::waitKey(1);
   }
 
