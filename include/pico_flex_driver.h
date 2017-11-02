@@ -1,19 +1,16 @@
 #pragma once
 
 #include <boost/make_shared.hpp>
-#include <chrono>
 #include <iostream>
-#include <memory>
 #include <mutex>
-#include <royale/CameraManager.hpp>
-#include <royale/String.hpp>
-#include <royale/Vector.hpp>
-#include <thread>
-#include <utility>
 
 #include <opencv2/core/core.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+
+#include <royale/ICameraDevice.hpp>
+#include <royale/IDepthDataListener.hpp>
+#include <royale/IDepthImageListener.hpp>
 
 namespace pico_flex_driver {
 
@@ -24,9 +21,22 @@ public:
   void StartCapture();
   void StopCapture();
 
-  boost::shared_ptr<const cv::Mat> GetDepthImage(uint64_t *ctr) const;
+  /**
+   * Returns a shared pointer of a const cv::Mat that contains the latest
+   * depth image or nullptr if no valid image has arrived yet. The caller is
+   * responsible for making a deep copy of the returned image if necessary.
+   * @param timestamp Timestamp of the depth image, in milliseconds.
+   */
+  boost::shared_ptr<const cv::Mat> GetDepthImage(uint64_t *timestamp) const;
+
+  /**
+   * Returns a shared pointer of a const point cloud or nullptr if no valid
+   * cloud data has arrived yet. The caller is responsible for making a deep
+   * copy of the returned cloud if necessary.
+   * @param timestamp Timestamp of the point cloud, in milliseconds.
+   */
   boost::shared_ptr<const pcl::PointCloud<pcl::PointXYZ>>
-  GetPointCloud(uint64_t *ctr) const;
+  GetPointCloud(uint64_t *timestamp) const;
 
 private:
   class DepthDataHandler : public royale::IDepthDataListener {
@@ -36,6 +46,8 @@ private:
       cloud->reserve(data->points.size());
 
       for (const auto &point : data->points) {
+        // TODO you can try to filter it by noise.
+
         // 0 = bad, 255 = good
         if (point.depthConfidence == 255) {
           pcl::PointXYZ pt{};
@@ -48,20 +60,20 @@ private:
 
       std::lock_guard<std::mutex> guard(mutex_);
       cloud_ = cloud;
-      ctr_++;
+      timestamp_ = data->timeStamp.count();
     }
 
     boost::shared_ptr<const pcl::PointCloud<pcl::PointXYZ>>
-    GetLatestPointCloud(uint64_t *ctr) const {
+    GetLatestPointCloud(uint64_t *timestamp) const {
       std::lock_guard<std::mutex> guard(mutex_);
-      *ctr = ctr_;
+      *timestamp = timestamp_;
       return cloud_;
     }
 
   private:
     mutable std::mutex mutex_;
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloud_{nullptr};
-    uint64_t ctr_{0};
+    uint64_t timestamp_{0};
   };
 
   class DepthImageHandler : public royale::IDepthImageListener {
@@ -83,23 +95,24 @@ private:
 
       std::lock_guard<std::mutex> guard(mutex_);
       depth_img_ = new_img;
-      ctr_++;
+      timestamp_ = static_cast<uint64_t>(img->timestamp);
     }
 
-    boost::shared_ptr<const cv::Mat> GetLatestDepthImage(uint64_t *ctr) const {
+    boost::shared_ptr<const cv::Mat>
+    GetLatestDepthImage(uint64_t *timestamp) const {
       std::lock_guard<std::mutex> guard(mutex_);
-      *ctr = ctr_;
+      *timestamp = timestamp_;
       return depth_img_;
     }
 
   private:
     mutable std::mutex mutex_;
     boost::shared_ptr<cv::Mat> depth_img_{nullptr};
-    uint64_t ctr_{0};
+    uint64_t timestamp_{0};
   };
 
-  std::unique_ptr<royale::ICameraDevice> camera_;
-  std::unique_ptr<DepthDataHandler> depth_data_handler_;
-  std::unique_ptr<DepthImageHandler> depth_img_handler_;
+  std::unique_ptr<royale::ICameraDevice> camera_{nullptr};
+  std::unique_ptr<DepthDataHandler> depth_data_handler_{nullptr};
+  std::unique_ptr<DepthImageHandler> depth_img_handler_{nullptr};
 };
 }

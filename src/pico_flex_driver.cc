@@ -1,4 +1,7 @@
 #include "pico_flex_driver.h"
+#include <royale/CameraManager.hpp>
+#include <royale/String.hpp>
+#include <royale/Vector.hpp>
 
 namespace pico_flex_driver {
 

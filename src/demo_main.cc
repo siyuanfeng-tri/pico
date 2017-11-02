@@ -1,6 +1,7 @@
 #include "pico_flex_driver.h"
 #include <opencv2/highgui/highgui.hpp>
 #include <pcl/visualization/pcl_visualizer.h>
+#include <thread>
 
 void CloudVizLoop(const pico_flex_driver::PicoFlexDriver *driver) {
   uint64_t timestamp;
