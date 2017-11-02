@@ -1,29 +1,49 @@
-#include "driver.h"
+#include "pico_flex_driver.h"
 #include <opencv2/highgui/highgui.hpp>
-#include <unistd.h>
+#include <pcl/visualization/pcl_visualizer.h>
+
+void CloudVizLoop(const pico_flex_driver::PicoFlexDriver *driver) {
+  uint64_t timestamp;
+
+  pcl::visualization::PCLVisualizer viewer("Point Cloud Visualization");
+  viewer.addCoordinateSystem(0.2, Eigen::Affine3f::Identity());
+
+  while (true) {
+    auto cloud = driver->GetPointCloud(&timestamp);
+    if (cloud) {
+      viewer.addPointCloud(cloud, "cloud");
+      viewer.spinOnce();
+      viewer.removePointCloud("cloud");
+    }
+  }
+}
+
+void DepthImgVizLoop(const pico_flex_driver::PicoFlexDriver *driver) {
+  uint64_t timestamp;
+  cv::namedWindow("Depth Image", cv::WINDOW_AUTOSIZE);
+  cv::Mat tmp;
+
+  while (true) {
+    auto img = driver->GetDepthImage(&timestamp);
+    if (img) {
+      // img is in mm, need to scale it to be better seen.
+      img->convertTo(tmp, CV_8UC1, 255. / 1000., 0);
+
+      cv::imshow("Depth Image", tmp);
+      cv::waitKey(5);
+    }
+  }
+}
 
 int main() {
   pico_flex_driver::PicoFlexDriver driver;
-
   driver.StartCapture();
 
-  cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);
-  usleep(1e6);
+  std::thread img_thread(DepthImgVizLoop, &driver);
+  std::thread cloud_thread(CloudVizLoop, &driver);
 
-  pico_flex_driver::PicoFlexDriver::DepthImage img;
-  uint64_t last_ctr = 0;
-
-  while (true) {
-    img = driver.GetDepthImage();
-    if (img.id == last_ctr) {
-      usleep(1e4);
-      continue;
-    }
-
-    //cv::imshow("Display window", img.confidence_image);
-    cv::imshow("Display window", img.depth_image);
-    cv::waitKey(1);
-  }
+  img_thread.join();
+  cloud_thread.join();
 
   return 0;
 }

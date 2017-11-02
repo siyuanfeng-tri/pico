@@ -1,8 +1,11 @@
-#include "driver.h"
+#include "pico_flex_driver.h"
 
 namespace pico_flex_driver {
 
 void PicoFlexDriver::StartCapture() {
+  depth_data_handler_ = std::make_unique<DepthDataHandler>();
+  depth_img_handler_ = std::make_unique<DepthImageHandler>();
+
   royale::CameraManager manager;
   auto camlist = manager.getConnectedCameraList();
   std::cout << "Detected " << camlist.size() << " camera(s)." << std::endl;
@@ -41,18 +44,17 @@ void PicoFlexDriver::StartCapture() {
       throw std::logic_error("Cannot set mode: " + desired_mode.toStdString());
     }
   } else {
-    throw std::logic_error("Does not have mode " +
-                           desired_mode.toStdString());
+    throw std::logic_error("Does not have mode " + desired_mode.toStdString());
   }
 
   // Set camera exposure. (micro seconds)
-  if (camera_->setExposureTime(10) != royale::CameraStatus::SUCCESS)
-
+  if (camera_->setExposureTime(10) != royale::CameraStatus::SUCCESS) {
     // Register callbacks.
     if (camera_->registerDataListener(depth_data_handler_.get()) !=
         royale::CameraStatus::SUCCESS) {
       throw std::logic_error("Error registering depth data listener");
     }
+  }
   if (camera_->registerDepthImageListener(depth_img_handler_.get()) !=
       royale::CameraStatus::SUCCESS) {
     throw std::logic_error("Error registering depth image listener");
@@ -69,34 +71,26 @@ void PicoFlexDriver::StopCapture() {
       throw std::logic_error("Error stopping the capturing.");
     }
     camera_.reset();
+    depth_data_handler_.reset();
+    depth_img_handler_.reset();
   }
 }
 
-PicoFlexDriver::DepthImage PicoFlexDriver::GetDepthImage() const {
+boost::shared_ptr<const cv::Mat>
+PicoFlexDriver::GetDepthImage(uint64_t *ctr) const {
   if (!camera_) {
     throw std::logic_error("Camera is not catpuring.");
   }
 
-  PicoFlexDriver::DepthImage ret;
+  return depth_img_handler_->GetLatestDepthImage(ctr);
+}
 
-  royale::DepthImage latest = depth_img_handler_->CopyLatestDepthImage(&ret.id);
-  if (latest.width * latest.height == 0) {
-    throw std::logic_error("Empty Frame.");
+boost::shared_ptr<const pcl::PointCloud<pcl::PointXYZ>>
+PicoFlexDriver::GetPointCloud(uint64_t *ctr) const {
+  if (!camera_) {
+    throw std::logic_error("Camera is not catpuring.");
   }
 
-  ret.timestamp = latest.timestamp;
-  ret.depth_image = cv::Mat(latest.height, latest.width, CV_32F);
-  ret.confidence_image = cv::Mat(latest.height, latest.width, CV_32F);
-  for (uint16_t i = 0; i < latest.height; i++) {
-    for (uint16_t j = 0; j < latest.width; j++) {
-      uint16_t data = latest.data.at(i * latest.width + j);
-      uint16_t z = data & 0x1fff;
-      uint16_t confidence = (data >> 13) & 0x7;
-      ret.depth_image.at<float>(i, j) = static_cast<float>(z) / 1e3;
-      ret.confidence_image.at<float>(i, j) = static_cast<float>(confidence) / 1e3;
-    }
-  }
-
-  return ret;
+  return depth_data_handler_->GetLatestPointCloud(ctr);
 }
 }

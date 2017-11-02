@@ -15,11 +15,11 @@
 #include <royale/CameraManager.hpp>
 #include <royale/ICameraDevice.hpp>
 
-namespace royale
-{
-    /*!
-     * Get the library version of Royale
-     */
-    ROYALE_API void getVersion (unsigned &major, unsigned &minor, unsigned &patch);
-    ROYALE_API void getVersion (unsigned &major, unsigned &minor, unsigned &patch, unsigned &build);
+namespace royale {
+/*!
+ * Get the library version of Royale
+ */
+ROYALE_API void getVersion(unsigned &major, unsigned &minor, unsigned &patch);
+ROYALE_API void getVersion(unsigned &major, unsigned &minor, unsigned &patch,
+                           unsigned &build);
 }
